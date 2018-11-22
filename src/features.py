@@ -100,7 +100,8 @@ def compute_features(file_name):
 
 
 def main():
-    extract_features('../audio_samples/group_1', 1)
+    df = extract_features('../audio_samples/group_1', 1)
+    save(df, 10)
 #    file_name = 'Blue Swede - Hooked On A Feeling.mp3'
 #    features = compute_features(file_name)
 #    save(features, 10)
@@ -127,22 +128,37 @@ def main():
     # save(features, 10)
     # test(features, 10)
 
+def save(df, n_digits):
+    df.to_csv('df.csv', float_format='%.{}e'.format(n_digits))
+
 def extract_features(folder_path, label):
     file_names = listdir(folder_path)
     full_columns = columns()
 
     df = pd.DataFrame(index=file_names, columns=full_columns)
 
-    for file in file_names:
-        path_to_file = folder_path + '/' + file
-        print('goint to compute feature for "{}" track'.format(path_to_file))
-        features = compute_features(path_to_file)
-        df.loc[file] = features
+    # single thread approach
+    # for file in file_names:
+    #     path_to_file = folder_path + '/' + file
+    #     print('goint to compute feature for "{}" track'.format(path_to_file))
+    #     features = compute_features(path_to_file)
+    #     df.loc[file] = features
+
+    # multithread approach
+    file_pathes = map(lambda x: folder_path + '/' + x, file_names)
+    #nb_workers = int(1.5 * len(os.sched_getaffinity(0)))
+    nb_workers = 4
+    pool = multiprocessing.Pool(nb_workers)
+    it = pool.map(compute_features, file_pathes)
+
+    for i, row in enumerate(tqdm(it, total=len(file_pathes))):
+        file_name = file_names[i]
+        df.loc[file_name] = row
 
     df.columns = [' '.join(col).strip() for col in df.columns.values]
     df['label'] = label
-    print(df.head())
-    df.to_csv('df.csv', float_format='%.{}e'.format(10))
+    
+    return df
 
 if __name__ == "__main__":
     main()
